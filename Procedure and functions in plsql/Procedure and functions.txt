@@ -1,0 +1,53 @@
+CREATE OR REPLACE PACKAGE emppack AS
+    FUNCTION GET_SERVICE_YRS(p_employee_id NUMBER) RETURN NUMBER;
+    PROCEDURE UPD_SAL(p_job_name VARCHAR2, p_new_min_salary NUMBER, p_new_max_salary NUMBER);
+END emppack;
+/
+
+CREATE OR REPLACE PACKAGE BODY emppack AS
+    FUNCTION GET_SERVICE_YRS(p_employee_id NUMBER) RETURN NUMBER
+    IS
+        v_service_yrs NUMBER;
+    BEGIN
+        SELECT TRUNC(MONTHS_BETWEEN(SYSDATE, hire_date) / 12) INTO v_service_yrs
+        FROM emp
+        WHERE emp_id = p_employee_id;
+
+        IF v_service_yrs IS NULL THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Invalid employee ID');
+        END IF;
+
+        RETURN v_service_yrs;
+    END;
+
+    PROCEDURE UPD_SAL(p_job_name VARCHAR2, p_new_min_salary NUMBER, p_new_max_salary NUMBER)
+    IS
+    BEGIN
+    -- Check if job name exists in the EMP table
+        IF NOT EXISTS(SELECT 1 FROM emp WHERE job = p_job_name) THEN
+            RAISE_APPLICATION_ERROR(-20002, 'Invalid job name');
+        END IF;
+
+        -- Check if max salary is greater than min salary
+        IF p_new_max_salary < p_new_min_salary THEN
+            RAISE_APPLICATION_ERROR(-20003, 'Maximum salary cannot be less than minimum salary');
+        END IF;
+
+        -- Update salaries for the specified job
+        UPDATE emp
+        SET sal = LEAST(GREATEST(sal, p_new_min_salary), p_new_max_salary)
+        WHERE job = p_job_name;
+    END;
+END emppack;
+/
+DECLARE
+    v_service_yrs NUMBER;
+BEGIN
+    v_service_yrs := emppack.GET_SERVICE_YRS(1001);
+    DBMS_OUTPUT.PUT_LINE('Years of service: ' || v_service_yrs);
+END;
+
+BEGIN
+    emppack.UPD_SAL('SALESMAN', 3000, 5000);
+END;
+
